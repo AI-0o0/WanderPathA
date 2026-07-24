@@ -5,6 +5,7 @@
 - Menna Sobhe
 - Abdelrahman Eslam
 - Youssef Abdelrahman
+
 ---
 
 # Company
@@ -281,12 +282,12 @@ Customer:
 
 Expected behavior:
 
-| Agent | Result |
-|--------|--------|
-| Reactive | Refund only |
-| Unconstrained ReAct | May check alternatives and offer rebooking |
-| Routing | Routes to Rebooking |
-| Constrained ReAct | Checks tools, validates reasoning, then recommends rebooking with escalation if needed |
+| Agent               | Result                                                                                 |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| Reactive            | Refund only                                                                            |
+| Unconstrained ReAct | May check alternatives and offer rebooking                                             |
+| Routing             | Routes to Rebooking                                                                    |
+| Constrained ReAct   | Checks tools, validates reasoning, then recommends rebooking with escalation if needed |
 
 ---
 
@@ -306,7 +307,6 @@ The **Unconstrained ReAct**, **Deterministic Routing**, and **Constrained ReAct*
 
 The **Reactive Agent** does not require an LLM.
 
---- 
 
 ## Allowed Tools
 

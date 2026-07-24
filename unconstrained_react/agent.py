@@ -6,8 +6,27 @@ from langchain.agents import create_agent
 from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from tools.booking_tools import GetFlightOptions, GetNearbyAirports
 from tools.customer_tools import (GetBookingHistory,
-                                  GetCustomerProfile, UpdateCustomerProfile)
+                                  GetCustomerProfile,
+                                  UpdateCustomerProfile)
 from tools.utilties import SearchWeb, GetCurrentDate, EndConversation
+from tools.travel_status_tools import (
+    get_flight_status,
+    get_delay_duration,
+    check_alternative_transport,
+    check_connection_risk,
+    check_disruption_reason,
+    get_estimated_departure,
+    get_estimated_arrival
+)
+from tools.finance_and_decision_tools import (
+    CheckRefundEligibility,
+    CalculateCompensation,
+    CalculateRefundAmount,
+    ProcessRefund,
+    IssueTravelVoucher,
+)
+from tools.escalation_tools import escalate_to_human
+
 from pydantic import BaseModel
 load_dotenv()
 
@@ -16,30 +35,43 @@ class AgentContext:
     user_id: str
 
 
-SYSTEM_PROMPT = (
-    "You are a travel support agent. "
-    "Use tools whenever they can answer the question directly — flights, airports, "
-    "visa rules, and customer/booking data should come from tools, not memory. "
-    "Only use the search tool when the answer requires current information the other "
-    "tools can't provide; it is costly, so use it sparingly. "
-    "If a tool call fails or returns no data, tell the user plainly — never fabricate "
-    "flight numbers, prices, visa rules, or customer details. "
-    "If the user asks you to end the conversation, call the end_conversation tool and exit gracefully. "
-    "Write in plain text with no headers, bullets, or markdown formatting. "
-    "Be concise: short, direct sentences, no filler or repeated information."
-)
+SYSTEM_PROMPT = ("""
+You are a Travel Support Agent.
+Help customers resolve issues that occur after they have booked their trip, such as flight delays, cancellations, rebooking, refunds, compensation, travel vouchers, and customer booking inquiries.
+Always use the available tools to retrieve customer, booking, and flight information instead of making assumptions.
+If alternative transportation or rebooking is available, suggest it before offering a refund.
+Use the web search tool only when the required information is unavailable through the provided tools.
+If a tool returns no data, tell the user honestly instead of guessing.
+If the user wants to end the conversation, call the end_conversation tool.
+Respond in concise plain text without markdown.
+""")
 
 TOOLS = [
     GetCurrentDate,
-    GetNearbyAirports,
-    GetFlightOptions,
     SearchWeb,
     GetCustomerProfile,
     GetBookingHistory,
     UpdateCustomerProfile,
-    EndConversation
-]
+    GetNearbyAirports,
+    GetFlightOptions,
+    get_flight_status,
+    get_delay_duration,
+    check_disruption_reason,
+    get_estimated_departure,
+    get_estimated_arrival,
+    check_connection_risk,
+    check_alternative_transport,
 
+    CheckRefundEligibility,
+    CalculateRefundAmount,
+    CalculateCompensation,
+    ProcessRefund,
+    IssueTravelVoucher,
+
+    escalate_to_human,
+
+    EndConversation,
+]
 
 agent = create_agent(
     model="google_genai:gemini-3.5-flash-lite",
@@ -51,18 +83,14 @@ def run_agent():
 
     print("Welcome to the Travel Support Agent!")
 
-    user_id = 12345
+    user_id = "C001" 
     context = AgentContext(user_id=user_id)
 
     messages = []
     ended = False
     while True:
-        
-        if ended:
-            print("thank you for using the Travel Support Agent. Goodbye!")
-            sys.exit(0)
-        user_input = input("User: ")
 
+        user_input = input("User: ")
         # Add the new user message to the conversation history
         messages.append(HumanMessage(content=user_input))
 
@@ -82,9 +110,13 @@ def run_agent():
                         ended = True
                 if latest_message.content:
                     print(f"Agent: {latest_message.content}")
-            # if isinstance(latest_message, ToolMessage):
-            #     print(f"Tool Result: {latest_message.content}")
+            if isinstance(latest_message, ToolMessage):
+                print(f"Tool Result: {latest_message.content}")
             messages = snapshot["messages"] 
+        if ended:
+            print("thank you for using the Travel Support Agent. Goodbye!")
+            sys.exit(0)
+        
 
 if __name__ == "__main__":
     run_agent()
