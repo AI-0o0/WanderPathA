@@ -114,6 +114,10 @@ def run_agent(user_id: str = "C001"):
 
         for _ in range(MAX_STEPS):
             step = structured_model.invoke(messages)
+            print(f"Thought      : {step.thought}")
+            print(f"Action       : {step.action}")
+            print(f"Action Input : {step.action_input}")
+            print(f"Is Final     : {step.is_final}")
             messages.append(AIMessage(content=step.model_dump_json()))
 
             if step.action == "escalate":
