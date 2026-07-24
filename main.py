@@ -16,26 +16,9 @@ def run_unconstrained() -> None:
 
 
 def run_routing() -> None:
-    print("\nRouting Agent")
-    print("This project does not contain a full routing agent yet.")
-    print("Enter a short request and get a simple routing decision.\n")
+    from routing.agent import run_agent
 
-    request = input("User: ").strip().lower()
-    if not request:
-        print("Agent: No input received.")
-        return
-
-    if any(word in request for word in ["refund", "money back"]):
-        route = "refund"
-    elif any(word in request for word in ["delay", "late", "cancel", "canceled", "cancelled"]):
-        route = "disruption"
-    elif any(word in request for word in ["booking", "reservation"]):
-        route = "booking"
-    else:
-        route = "general support"
-
-    print(f"Agent: Routed to the {route} path.")
-
+    run_agent()
 
 def run_constrained() -> None:
     from constrained_react.agent import run_agent
