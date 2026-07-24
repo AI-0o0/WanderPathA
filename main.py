@@ -82,4 +82,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    print("after choosing the model, you can exit the agent by typing ctrl+c.")
     main()
