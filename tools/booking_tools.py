@@ -1,9 +1,6 @@
-import json
-from pathlib import Path
 from langchain.tools import tool
-
-DATA_DIR = Path(__file__).resolve().parent.parent / "shared" / "data"
-
+from shared.database import get_connection
+from shared.validation import airport_exists
 
 @tool(
     "get_nearby_airports",
@@ -11,22 +8,31 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "shared" / "data"
     description="Get nearby airports based on the provided city.",
 )
 def GetNearbyAirports(city: str) -> list:
-    """
-    Get all airports located in the specified city.
-    """
-    with open(DATA_DIR / "airports.json", "r", encoding="utf-8") as file:
-        airports = json.load(file)
 
-    city = city.strip().lower()
+    if not city.strip():
+        raise ValueError("City is required.")
 
-    return [
-        {
-            "skyId": code,
-            **airport,
-        }
-        for code, airport in airports.items()
-        if airport["city"].strip().lower() == city
-    ]
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT
+            airport_code AS skyId,
+            airport_name,
+            city,
+            country,
+            weather,
+            status
+        FROM Airports
+        WHERE LOWER(city) = LOWER(%s)
+    """, (city,))
+
+    airports = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return airports
 
 
 @tool(
@@ -39,29 +45,37 @@ def GetFlightOptions(
     destinationSkyId: str,
     departureDate: str,
 ) -> list:
-    """
-    Get flight options based on the provided parameters.
 
-    Args:
-        originSkyId: Origin airport code (e.g. CAI).
-        destinationSkyId: Destination airport code (e.g. DXB).
-        departureDate: Departure date in YYYY-MM-DD format.
+    if not originSkyId:
+        raise ValueError("Origin airport is required.")
 
-    Returns:
-        A list of matching flights.
-    """
-    with open(DATA_DIR / "flights.json", "r", encoding="utf-8") as file:
-        flights = json.load(file)
+    if not destinationSkyId:
+        raise ValueError("Destination airport is required.")
 
-    return [
-        {
-            "flight_id": flight_id,
-            **flight,
-        }
-        for flight_id, flight in flights.items()
-        if (
-            flight["origin"] == originSkyId
-            and flight["destination"] == destinationSkyId
-            and flight["departure_date"] == departureDate
-        )
-    ]
+    if not departureDate:
+        raise ValueError("Departure date is required.")
+
+    airport_exists(originSkyId)
+    airport_exists(destinationSkyId)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT *
+        FROM Flights
+        WHERE origin_airport = %s
+          AND destination_airport = %s
+          AND DATE(departure_time) = %s
+    """, (
+        originSkyId,
+        destinationSkyId,
+        departureDate,
+    ))
+
+    flights = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return flights
