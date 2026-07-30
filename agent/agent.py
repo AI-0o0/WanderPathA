@@ -1,3 +1,4 @@
+import asyncio
 from pydantic import ValidationError
 from dataclasses import dataclass
 from langchain.messages import AIMessage, HumanMessage, SystemMessage
@@ -34,9 +35,12 @@ Use ONLY these tools:
 
 {tool_list}
 
-Think step by step.
+Additional Instructions:
+1. Do NOT retry calling a tool if you already received an Observation from it.
+2. Once you have gathered enough information to answer the user's question, set your action to 'final_answer' and provide the final response in 'action_input.answer'.
+3. Do NOT invent or call tools that are not listed above.
 
-Return only the structured response.
+Think step by step and return only the structured response.
 """
 
 def build_structured_model():
@@ -46,16 +50,49 @@ def build_structured_model():
         max_retries=3,
     ).with_structured_output(AgentStep)
 
+#groq
+# def build_structured_model():
+#     return init_chat_model(
+#         model="llama-3.3-70b-versatile",
+#         model_provider="groq",
+#         max_tokens=1024,
+#         max_retries=3,
+#     ).with_structured_output(AgentStep)
+
 #  # Issue 6
-# async def discover_tools(client):
+async def discover_tools(client):
+    tools = await client.get_tools()
+
+    print("Available tools:")
+    for tool in tools:
+        print("-", tool.name)
+
+    return {tool.name: tool for tool in tools}
 
 
 #   # Issue  10    
-# def validate_step(step, tools) -> bool:
+def validate_step(step, tools) -> bool:
+    valid_actions = {"final_answer", "end_conversation", "escalate"}
+    return step.action in valid_actions or step.action in tools
 
 #  # Issue 7 
-# async def tool_call(step: AgentStep, tools: dict, context: AgentContext = None):
+async def tool_call(step: AgentStep, tools: dict, context: AgentContext = None):
+    tool = tools[step.action]
 
+    schema_cls = ACTION_INPUT_SCHEMAS.get(step.action)
+    if schema_cls:
+        validated_input = schema_cls(**step.action_input)
+        payload = validated_input.model_dump()
+        result = await tool.ainvoke(payload)
+    
+        return result
+    else:
+        payload = step.action_input
+
+    if context and isinstance(payload, dict):
+        payload["user_id"] = context.user_id
+    result = await tool.ainvoke(payload)
+    return result
 
 def handle_final_action(step):
 
@@ -75,7 +112,7 @@ def handle_final_action(step):
 
 #observation
 def handle_tool_result(messages, step, result):
-
+    print(f"Observation from {step.action}: {result}")
     messages.append(
         HumanMessage(
             content=f"Observation from {step.action}: {result}"
@@ -84,7 +121,7 @@ def handle_tool_result(messages, step, result):
 
 async def run_agent(client, user_input: str, user_id: str = "C001"):
     tools = await discover_tools(client)
-    
+    context = AgentContext(user_id=user_id)
     system_prompt = build_system_prompt(list(tools.keys()))
     model = build_structured_model()
     
@@ -100,6 +137,9 @@ async def run_agent(client, user_input: str, user_id: str = "C001"):
         step: AgentStep = await model.ainvoke(messages)
         print(f"Thought: {step.thought}")
         print(f"Action: {step.action}")
+        messages.append(
+            AIMessage(content=f"Thought: {step.thought}\nAction: {step.action}\nInput: {step.action_input}")
+        )
         #(Final Action)
         if handle_final_action(step):
             return step
@@ -112,10 +152,13 @@ async def run_agent(client, user_input: str, user_id: str = "C001"):
 
         # (MCP Tool Execution)
         try:
-            result = await tool_call(step, tools)
+            result = await tool_call(step, tools, context=context) 
             handle_tool_result(messages, step, result)
+            messages.append(
+                HumanMessage(content=f"Observation from tool '{step.action}': {result}")
+            )  
+            
         except ValidationError as e:
-            # إرجاع خطأ الـ Schema للـ LLM علشان يعمل Self-Correction
             messages.append(
                 HumanMessage(content=f"Invalid arguments for {step.action}: {e.errors()}")
             )
@@ -127,5 +170,9 @@ async def run_agent(client, user_input: str, user_id: str = "C001"):
     return None
 
 
+async def main():
+    print("Agent module ready. Use run_agent(client, user_input) inside an active client session.")
+
+
 if __name__ == "__main__":
-    run_agent()
+    asyncio.run(main())
