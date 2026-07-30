@@ -1,35 +1,90 @@
 import asyncio
 import os
 import sys
-from langchain_mcp_adapters.client import MultiServerMCPClient
 
-# Point to MCP server script relative to this file
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.tools import load_mcp_tools
+from langchain_mcp_adapters.resources import load_mcp_resources
+
 path_to_mcp_server = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../server/server.py")
 )
-mode = sys.argv[1]
+
+mode = sys.argv[1] if len(sys.argv) > 1 else "stdio"
+
+
 async def main():
-    # Configure the client connection
+
     if mode == "stdio":
         server_params = {
-            "my_server": {
+            "wanderpath_server": {
                 "transport": "stdio",
-                "command": "python",
+                "command": sys.executable,
                 "args": [path_to_mcp_server, "stdio"],
             }
         }
-    else:
+    elif mode == "http":
         server_params = {
-            "my_server": {
-                "transport": "streamable_http",
+            "wanderpath_server": {
+                "transport": "http",
                 "url": "http://127.0.0.1:8000/mcp",
             }
-        }   
-
-    # Initialize the client directly without 'async with'
+        }
+    else:
+        raise ValueError(f"Invalid mode: {mode}. Must be 'stdio' or 'http'.")
+    print(f"\nConnecting using [{mode}] transport...\n")
     client = MultiServerMCPClient(server_params)
-    tools = await client.get_tools()
-    print("Available tools:", tools)
+    async with client.session("wanderpath_server") as session:
+        # 1. Capability Negotiation
+        caps = session.get_server_capabilities()
+        print("=" * 60)
+        print("CAPABILITY NEGOTIATION")
+        print("=" * 60)
+        print(f"Tools Supported      : {caps.tools is not None}")
+        print(f"Resources Supported  : {caps.resources is not None}")
+        print(f"Prompts Supported    : {caps.prompts is not None}")
+        print("=" * 60)
+        # 2. Resource Discovery
+        if caps.resources is not None:
+            print("\nRESOURCE DISCOVERY")
+            resources = await load_mcp_resources(session)
+            if resources:
+                print(f"Found {len(resources)} resource(s)\n")
+            for resource in resources:
+                metadata = getattr(resource, "metadata", {})
+                uri = metadata.get("uri", "Unknown URI")
+
+                print(f"  URI : {uri}")
+                print(f"  Data: {resource.data}")
+            if len(resources) == 0:
+                print("Server supports resources, but none are registered.")
+        # 3. Prompt Discovery
+        if caps.prompts is not None:
+            print("\nPROMPT DISCOVERY")
+            result = await session.list_prompts()
+            prompts = getattr(result, "prompts", [])
+            if prompts:
+                print(f"Found {len(prompts)} prompt(s)\n")
+                for prompt in prompts:
+                    print(f"- {prompt.name}")
+            else:
+                print("Server supports prompts, but none are registered.")
+
+        # 4. Tool Discovery
+        if caps.tools is not None:
+            print("\nTOOL DISCOVERY")
+            tools = await load_mcp_tools(session)
+            if tools:
+                print(f"Found {len(tools)} tool(s)\n")
+                for tool in tools:
+                    print(f"- {tool.name}")
+                    if tool.description:
+                        print(f"  {tool.description}")
+            else:
+                print("Server supports tools, but no tools are registered.")
+
+        print("\nFinished.")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
