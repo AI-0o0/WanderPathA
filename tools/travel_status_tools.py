@@ -1,26 +1,33 @@
-import json
 from langchain.tools import tool
-
-
-def _load_json_file(file_path: str, default):
-    try:
-        with open(file_path, "r") as f:
-            content = f.read().strip()
-            if not content:
-                return default
-            return json.loads(content)
-    except FileNotFoundError:
-        return default
-
+from shared.database import get_connection
+from shared.validation import (
+    flight_exists,
+    airport_exists,
+)
 
 @tool(
     "get_flight_status",
     return_direct=False,
     description="Get the current status of a flight."
 )
-def get_flight_status(flight_id: str) -> str:
-    flights = _load_json_file("shared/data/flights.json", {})
-    return flights.get(flight_id, {}).get("status")
+def get_flight_status(flight_id: int) -> str:
+
+    flight_exists(flight_id)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT status FROM Flights WHERE flight_id=%s",
+        (flight_id,)
+    )
+
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return result["status"]
 
 
 @tool(
@@ -28,9 +35,24 @@ def get_flight_status(flight_id: str) -> str:
     return_direct=False,
     description="Get the delay duration of a flight in minutes."
 )
-def get_delay_duration(flight_id: str) -> int:
-    flights = _load_json_file("shared/data/flights.json", {})
-    return flights.get(flight_id, {}).get("delay_minutes")
+def get_delay_duration(flight_id: int) -> int:
+
+    flight_exists(flight_id)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT delay_minutes FROM Flights WHERE flight_id=%s",
+        (flight_id,)
+    )
+
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return result["delay_minutes"]
 
 
 @tool(
@@ -38,9 +60,24 @@ def get_delay_duration(flight_id: str) -> int:
     return_direct=False,
     description="Get the reason for a flight disruption or delay."
 )
-def check_disruption_reason(flight_id: str) -> str:
-    flights = _load_json_file("shared/data/flights.json", {})
-    return flights.get(flight_id, {}).get("reason")
+def check_disruption_reason(flight_id: int) -> str:
+
+    flight_exists(flight_id)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT disruption_reason FROM Flights WHERE flight_id=%s",
+        (flight_id,)
+    )
+
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return result["disruption_reason"]
 
 
 @tool(
@@ -49,8 +86,23 @@ def check_disruption_reason(flight_id: str) -> str:
     description="Get the current weather conditions at an airport."
 )
 def get_weather(airport_code: str) -> str:
-    airports = _load_json_file("shared/data/airports.json", {})
-    return airports.get(airport_code, {}).get("weather")
+
+    airport_exists(airport_code)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT weather FROM Airports WHERE airport_code=%s",
+        (airport_code,)
+    )
+
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return result["weather"]
 
 
 @tool(
@@ -59,8 +111,23 @@ def get_weather(airport_code: str) -> str:
     description="Get the operational status of an airport."
 )
 def check_airport_status(airport_code: str) -> str:
-    airports = _load_json_file("shared/data/airports.json", {})
-    return airports.get(airport_code, {}).get("status")
+
+    airport_exists(airport_code)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT status FROM Airports WHERE airport_code=%s",
+        (airport_code,)
+    )
+
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return result["status"]
 
 
 @tool(
@@ -68,9 +135,24 @@ def check_airport_status(airport_code: str) -> str:
     return_direct=False,
     description="Check whether a delayed flight may cause a missed connection."
 )
-def check_connection_risk(flight_id: str) -> bool:
-    flights = _load_json_file("shared/data/flights.json", {})
-    return flights.get(flight_id, {}).get("connection_risk")
+def check_connection_risk(flight_id: int) -> bool:
+
+    flight_exists(flight_id)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT connection_risk FROM Flights WHERE flight_id=%s",
+        (flight_id,)
+    )
+
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return result["connection_risk"]
 
 
 @tool(
@@ -78,9 +160,24 @@ def check_connection_risk(flight_id: str) -> bool:
     return_direct=False,
     description="Get the estimated departure time of a flight."
 )
-def get_estimated_departure(flight_id: str) -> str:
-    flights = _load_json_file("shared/data/flights.json", {})
-    return flights.get(flight_id, {}).get("estimated_departure")
+def get_estimated_departure(flight_id: int):
+
+    flight_exists(flight_id)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT estimated_departure_time FROM Flights WHERE flight_id=%s",
+        (flight_id,)
+    )
+
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return result["estimated_departure_time"]
 
 
 @tool(
@@ -88,9 +185,24 @@ def get_estimated_departure(flight_id: str) -> str:
     return_direct=False,
     description="Get the estimated arrival time of a flight."
 )
-def get_estimated_arrival(flight_id: str) -> str:
-    flights = _load_json_file("shared/data/flights.json", {})
-    return flights.get(flight_id, {}).get("estimated_arrival")
+def get_estimated_arrival(flight_id: int):
+
+    flight_exists(flight_id)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT estimated_arrival_time FROM Flights WHERE flight_id=%s",
+        (flight_id,)
+    )
+
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return result["estimated_arrival_time"]
 
 
 @tool(
@@ -98,12 +210,25 @@ def get_estimated_arrival(flight_id: str) -> str:
     return_direct=False,
     description="Get available alternative transportation options for a destination."
 )
-def check_alternative_transport(destination: str) -> list:
-    transport = _load_json_file(
-        "shared/data/alternative_transport.json",
-        {}
-    )
-    return transport.get(destination, [])
+def check_alternative_transport(destination: str):
+
+    airport_exists(destination)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT *
+        FROM AlternativeTransport
+        WHERE destination_airport = %s
+    """, (destination,))
+
+    transport = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return transport
 
 
 @tool(
@@ -111,6 +236,22 @@ def check_alternative_transport(destination: str) -> list:
     return_direct=False,
     description="Get the severity level of a flight disruption."
 )
-def get_disruption_severity(flight_id: str) -> str:
-    flights = _load_json_file("shared/data/flights.json", {})
-    return flights.get(flight_id, {}).get("severity")
+def get_disruption_severity(flight_id: int):
+
+    flight_exists(flight_id)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT severity
+        FROM Flights
+        WHERE flight_id = %s
+    """, (flight_id,))
+
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return result["severity"]

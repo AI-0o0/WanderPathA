@@ -1,33 +1,35 @@
-import json
-from dataclasses import dataclass
+from shared.validation import (
+    booking_exists,
+    validate_refund_amount,
+    validate_voucher_value,
+)
 
-from langchain.tools import tool, ToolRuntime
-
-
-@dataclass
-class AgentContext:
-    user_id: str
-
-
-def _load_json_file(file_path: str, default):
-    try:
-        with open(file_path, "r") as f:
-            content = f.read().strip()
-            if not content:
-                return default
-            return json.loads(content)
-    except FileNotFoundError:
-        return default
-
+from shared.authorization import manager_required
 
 @tool(
     "calculate_trip_cost",
     return_direct=False,
     description="Calculate the total trip cost for a booking."
 )
-def CalculateTripCost(booking_id: str) -> float:
-    bookings = _load_json_file("shared/data/bookings.json", {})
-    return bookings.get(booking_id, {}).get("trip_cost")
+def CalculateTripCost(booking_id: int) -> float:
+
+    booking_exists(booking_id)
+
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT trip_cost
+        FROM Bookings
+        WHERE booking_id = %s
+    """, (booking_id,))
+
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return result["trip_cost"]
 
 
 @tool(
@@ -35,9 +37,24 @@ def CalculateTripCost(booking_id: str) -> float:
     return_direct=False,
     description="Check whether a booking is eligible for a refund."
 )
-def CheckRefundEligibility(booking_id: str) -> bool:
-    bookings = _load_json_file("shared/data/bookings.json", {})
-    return bookings.get(booking_id, {}).get("refund_eligible")
+def CheckRefundEligibility(booking_id: int) -> bool:
+
+    booking_exists(booking_id)
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT refund_eligible
+        FROM Bookings
+        WHERE booking_id = %s
+    """, (booking_id,))
+
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return result["refund_eligible"]
 
 
 @tool(
@@ -45,9 +62,24 @@ def CheckRefundEligibility(booking_id: str) -> bool:
     return_direct=False,
     description="Calculate the refund amount for a booking."
 )
-def CalculateRefundAmount(booking_id: str) -> float:
-    bookings = _load_json_file("shared/data/bookings.json", {})
-    return bookings.get(booking_id, {}).get("refund_amount")
+def CalculateRefundAmount(booking_id: int) -> float:
+
+    booking_exists(booking_id)
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT refund_amount
+        FROM Refunds
+        WHERE booking_id = %s
+    """, (booking_id,))
+
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return result["refund_amount"] if result else 0
 
 
 @tool(
@@ -55,10 +87,47 @@ def CalculateRefundAmount(booking_id: str) -> float:
     return_direct=False,
     description="Process the refund for a booking."
 )
-def ProcessRefund(booking_id: str) -> dict:
+def ProcessRefund(
+    booking_id: int,
+    employee_id: int,
+    refund_amount: float,
+) -> dict:
+
+    booking_exists(booking_id)
+    manager_required(employee_id)
+    validate_refund_amount(refund_amount)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO Refunds
+        (
+            booking_id,
+            processed_by,
+            refund_amount,
+            status,
+            processed_date
+        )
+        VALUES (%s,%s,%s,%s,%s)
+    """, (
+        booking_id,
+        employee_id,
+        refund_amount,
+        "Processed",
+        datetime.now(),
+    ))
+
+    conn.commit()
+
+    refund_id = cursor.lastrowid
+
+    cursor.close()
+    conn.close()
+
     return {
-        "booking_id": booking_id,
-        "status": "Refund Processed",
+        "refund_id": refund_id,
+        "status": "Processed",
     }
 
 
@@ -67,9 +136,18 @@ def ProcessRefund(booking_id: str) -> dict:
     return_direct=False,
     description="Calculate the compensation amount for a booking."
 )
-def CalculateCompensation(booking_id: str) -> float:
-    bookings = _load_json_file("shared/data/bookings.json", {})
-    return bookings.get(booking_id, {}).get("compensation")
+def CalculateCompensation(booking_id: int) -> float:
+
+    booking_exists(booking_id)
+
+    eligible = CheckRefundEligibility.invoke(
+        {"booking_id": booking_id}
+    )
+
+    if eligible:
+        return 100.0
+
+    return 0.0
 
 
 @tool(
@@ -77,10 +155,17 @@ def CalculateCompensation(booking_id: str) -> float:
     return_direct=False,
     description="Issue a travel voucher for a booking."
 )
-def IssueTravelVoucher(booking_id: str) -> dict:
+def IssueTravelVoucher(
+    booking_id: int,
+    voucher_value: float,
+) -> dict:
+
+    booking_exists(booking_id)
+    validate_voucher_value(voucher_value)
+
     return {
         "booking_id": booking_id,
-        "voucher": "$100 Travel Voucher",
+        "voucher": f"${voucher_value} Travel Voucher",
     }
 
 
@@ -90,16 +175,24 @@ def IssueTravelVoucher(booking_id: str) -> dict:
     description="Compare the original trip cost with a new rebooking cost."
 )
 def CompareRebookingCost(
-    old_booking_id: str,
+    old_booking_id: int,
     new_booking_cost: float,
 ) -> str:
-    bookings = _load_json_file("shared/data/bookings.json", {})
 
-    old_cost = bookings.get(old_booking_id, {}).get("trip_cost", 0)
+    booking_exists(old_booking_id)
 
+    if new_booking_cost <= 0:
+        raise ValueError(
+            "New booking cost must be greater than zero."
+        )
+
+    old_cost = CalculateTripCost.invoke(
+        {"booking_id": old_booking_id}
+    )
     if new_booking_cost > old_cost:
         return "Additional Payment Required"
+
     elif new_booking_cost < old_cost:
         return "Refund Difference"
-    else:
-        return "No Price Difference"
+
+    return "No Price Difference"
