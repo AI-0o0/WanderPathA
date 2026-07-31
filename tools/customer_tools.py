@@ -16,7 +16,7 @@ class AgentContext:
     return_direct=False,
     description="Get the customer profile based on the provided customer ID.",
 )
-def GetCustomerProfile(user_id: int) -> dict:
+def get_customer_profile(user_id: int) -> dict:
 
     customer_exists(user_id)
 
@@ -42,7 +42,7 @@ def GetCustomerProfile(user_id: int) -> dict:
     return_direct=False,
     description="Get the booking history for the current customer."
 )
-def GetBookingHistory(user_id: int) -> list:
+def get_booking_history(user_id: int) -> list:
 
     customer_exists(user_id)
 

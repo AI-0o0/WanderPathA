@@ -5,6 +5,7 @@ import sys
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
 from langchain_mcp_adapters.resources import load_mcp_resources
+from langchain_mcp_adapters.callbacks import Callbacks, CallbackContext
 
 path_to_mcp_server = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../server/server.py")
@@ -12,6 +13,35 @@ path_to_mcp_server = os.path.abspath(
 
 mode = sys.argv[1] if len(sys.argv) > 1 else "stdio"
 
+from mcp.types import ElicitResult
+
+async def on_elicitation(
+    mcp_context,
+    params,
+    context,
+):
+    print("\n" + "=" * 50)
+    print("REFUND CONFIRMATION")
+    print("=" * 50)
+
+    print(params.message)
+
+    answer = input("\nType 'confirm' or 'cancel': ").strip().lower()
+
+    if answer == "confirm":
+        return ElicitResult(
+            action="accept",
+            content={
+                "value": "confirm"
+            }
+        )
+
+    return ElicitResult(
+        action="decline",
+    )
+callbacks = Callbacks(
+    on_elicitation=on_elicitation
+)
 
 
 
@@ -35,7 +65,10 @@ async def create_client():
     else:
         raise ValueError(f"Invalid mode: {mode}. Must be 'stdio' or 'http'.")
     print(f"\nConnecting using [{mode}] transport...\n")
-    client = MultiServerMCPClient(server_params)
+    client = MultiServerMCPClient(
+    server_params,
+    callbacks=callbacks,
+    )
     async with client.session("wanderpath_server") as session:
         # 1. Capability Negotiation
         caps = session.get_server_capabilities()

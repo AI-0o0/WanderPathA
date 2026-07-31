@@ -1,5 +1,5 @@
 from datetime import datetime
-
+from langchain.tools import tool
 from shared.validation import (
     booking_exists,
     customer_exists,
