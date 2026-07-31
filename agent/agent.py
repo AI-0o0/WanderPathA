@@ -103,7 +103,10 @@ def handle_final_action(step):
         return True
 
     if step.action == "end_conversation":
-        print(step.action_input["answer"])
+        if step.action_input:
+            print(step.action_input.get("answer", "Goodbye!"))
+        else:
+            print("Goodbye!")
         return True
 
     if step.action == "escalate":

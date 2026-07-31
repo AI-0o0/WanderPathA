@@ -40,12 +40,15 @@ async def main():
                 print("Logged out.")
                 break
 
-            await run_agent(
+            step = await run_agent(
                 client=client,
                 user_input=user_input,
                 user_id=user_id
             )
 
+            if step and step.action == "end_conversation":
+                print("Conversation ended.")
+                break
 
 if __name__ == "__main__":
     asyncio.run(main())
