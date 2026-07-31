@@ -71,8 +71,8 @@ def CalculateRefundAmount(booking_id: int) -> float:
     cursor = conn.cursor(dictionary=True)
 
     cursor.execute("""
-        SELECT refund_amount
-        FROM Refunds
+        SELECT trip_cost
+        FROM Bookings
         WHERE booking_id = %s
     """, (booking_id,))
 
@@ -81,7 +81,7 @@ def CalculateRefundAmount(booking_id: int) -> float:
     cursor.close()
     conn.close()
 
-    return result["refund_amount"] if result else 0
+    return result["trip_cost"] if result else 0
 
 
 @tool(

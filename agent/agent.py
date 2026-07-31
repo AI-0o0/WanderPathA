@@ -64,10 +64,6 @@ async def discover_tools(client):
     # turns from list to dict
     tools_dict = {tool.name: tool for tool in tools_list}
 
-    print("Available tools discovered:")
-    for tool_name in tools_dict.keys():
-        print(f"- {tool_name}")
-
     return tools_dict  # Dict: {tool_name: tool_instance}
 
 #   # Issue  10    
