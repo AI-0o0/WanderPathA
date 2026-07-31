@@ -13,7 +13,9 @@ path_to_mcp_server = os.path.abspath(
 mode = sys.argv[1] if len(sys.argv) > 1 else "stdio"
 
 
-async def main():
+
+
+async def create_client():
 
     if mode == "stdio":
         server_params = {
@@ -84,7 +86,8 @@ async def main():
                 print("Server supports tools, but no tools are registered.")
 
         print("\nFinished.")
+        return client
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(create_client())

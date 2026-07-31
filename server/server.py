@@ -1,6 +1,8 @@
 import sys
 import os
 from fastmcp import FastMCP , Context
+import mcp.types as types 
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.abspath(os.path.join(current_dir, ".."))
 sys.path.append(parent_dir)
@@ -14,7 +16,11 @@ from tools.booking_tools import (
     GetNearbyAirports,
     GetFlightOptions
 )
-import mcp.types as types
+from tools.customer_tools import (
+    GetCustomerProfile,
+    GetBookingHistory
+)
+
 # Initialize FastMCP server for WanderPathA
 mcp = FastMCP("WanderPathA Travel Agent Server")
 
@@ -25,9 +31,11 @@ mcp.tool()(get_delay_duration.func)
 mcp.tool()(check_disruption_reason.func)
 mcp.tool()(GetNearbyAirports.func)
 mcp.tool()(GetFlightOptions.func)
+mcp.tool()(GetCustomerProfile.func)
+mcp.tool()(GetBookingHistory.func)
+
 
 # Sampling 
-@mcp.tool()
 @mcp.tool()
 async def evaluate_cancellation_reason(
     ctx: Context,

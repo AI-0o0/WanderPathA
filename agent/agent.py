@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from langchain.messages import AIMessage, HumanMessage, SystemMessage
 from langchain.chat_models import init_chat_model
 from dotenv import load_dotenv
-from schema import (
+from .schema import (
     ACTION_INPUT_SCHEMAS,
     AgentStep,
     MAX_STEPS,
