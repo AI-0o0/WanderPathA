@@ -43,32 +43,34 @@ Additional Instructions:
 Think step by step and return only the structured response.
 """
 
-def build_structured_model():
-    return init_chat_model(
-        model="google_genai:gemini-3.5-flash-lite",
-        max_tokens=1024,
-        max_retries=3,
-    ).with_structured_output(AgentStep)
-
-#groq
 # def build_structured_model():
 #     return init_chat_model(
-#         model="llama-3.3-70b-versatile",
-#         model_provider="groq",
+#         model="google_genai:gemini-3.5-flash-lite",
 #         max_tokens=1024,
 #         max_retries=3,
 #     ).with_structured_output(AgentStep)
 
+#groq
+def build_structured_model():
+    return init_chat_model(
+        model="llama-3.3-70b-versatile",
+        model_provider="groq",
+        max_tokens=1024,
+        max_retries=3,
+    ).with_structured_output(AgentStep)
+
 #  # Issue 6
 async def discover_tools(client):
-    tools = await client.get_tools()
+    """Dynamically fetches and registers available tools from the MCP Client."""
+    tools_list = await client.get_tools()
+    # turns from list to dict
+    tools_dict = {tool.name: tool for tool in tools_list}
 
-    print("Available tools:")
-    for tool in tools:
-        print("-", tool.name)
+    print("Available tools discovered:")
+    for tool_name in tools_dict.keys():
+        print(f"- {tool_name}")
 
-    return {tool.name: tool for tool in tools}
-
+    return tools_dict  # Dict: {tool_name: tool_instance}
 
 #   # Issue  10    
 def validate_step(step, tools) -> bool:
@@ -76,21 +78,24 @@ def validate_step(step, tools) -> bool:
     return step.action in valid_actions or step.action in tools
 
 #  # Issue 7 
+#  Issue #7: Tool Execution Engine
 async def tool_call(step: AgentStep, tools: dict, context: AgentContext = None):
+    """Validates payload schema, injects runtime context, and executes tool."""
     tool = tools[step.action]
 
+    payload = step.action_input
+
+    # 1. Pydantic validation if schema exists
     schema_cls = ACTION_INPUT_SCHEMAS.get(step.action)
     if schema_cls:
         validated_input = schema_cls(**step.action_input)
         payload = validated_input.model_dump()
-        result = await tool.ainvoke(payload)
-    
-        return result
-    else:
-        payload = step.action_input
 
+    # 2. Inject context (user_id) if missing
     if context and isinstance(payload, dict):
-        payload["user_id"] = context.user_id
+        payload.setdefault("user_id", context.user_id)
+
+    # 3. Asynchronous execution
     result = await tool.ainvoke(payload)
     return result
 
@@ -143,17 +148,22 @@ async def run_agent(client, user_input: str, user_id: str = "C001"):
         #(Final Action)
         if handle_final_action(step):
             return step
-
-        if step.action not in tools:
+        
+        #  Step Validation check
+        if not validate_step(step, tools):
             messages.append(
-                HumanMessage(content=f"Error: '{step.action}' is not a valid tool. Choose from: {list(tools.keys())}")
+                HumanMessage(
+                    content=f"Error: '{step.action}' is not a valid tool. Choose from: {list(tools.keys())}"
+                )
             )
             continue
+
 
         # (MCP Tool Execution)
         try:
             result = await tool_call(step, tools, context=context) 
             handle_tool_result(messages, step, result)
+
             messages.append(
                 HumanMessage(content=f"Observation from tool '{step.action}': {result}")
             )  
