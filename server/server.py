@@ -28,48 +28,74 @@ mcp.tool()(GetFlightOptions.func)
 
 # Sampling 
 @mcp.tool()
+@mcp.tool()
 async def evaluate_cancellation_reason(
     ctx: Context,
     booking_id: str = "BK-9921",
     user_reason: str = "",
     cancellation_reason: str = "",
-    reason:str="", user_id:str=""
+    reason: str = "",
+    user_id: str = "",
 ) -> str:
   """Evaluates refund eligibility using LLM sampling with automated fallback."""
-  reason = user_reason or cancellation_reason or "Emergency"
+  eval_reason = reason or user_reason or cancellation_reason or "Emergency"
   b_id = booking_id or "BK-9921"
 
+  prompt = (
+      f"Evaluate the travel cancellation reason: '{eval_reason}'. Does it"
+      " qualify for a 100% full refund according to emergency travel policy?"
+      " Respond ONLY with 'APPROVED' or 'DENIED' followed by a brief"
+      " explanation."
+  )
+
   try:
-    prompt = f"Is '{reason}' valid for a 100% refund? Answer APPROVED or DENIED."
-    await ctx.session.create_message(
-        messages=[{"role": "user", "content": prompt}], max_tokens=50
+    sampling_response = await ctx.session.create_message(
+        messages=[{"role": "user", "content": prompt}], max_tokens=100
     )
+
+    llm_output = ""
+    if hasattr(sampling_response, "content") and sampling_response.content:
+      if isinstance(sampling_response.content, list):
+        llm_output = "\n".join(
+            [getattr(c, "text", str(c)) for c in sampling_response.content]
+        )
+      else:
+        llm_output = getattr(
+            sampling_response.content, "text", str(sampling_response.content)
+        )
+
+    return (
+        f"Policy Evaluation Result for Booking {b_id} (via LLM"
+        f" Sampling):\n{llm_output.strip()}"
+    )
+
   except Exception as e:
+    # Fallback 
     print(f"[Sampling Attempt Logged]: {e}")
 
-  reason_lower = reason.lower()
-  if any(
-      kw in reason_lower
-      for kw in [
-          "flood",
-          "weather",
-          "medical",
-          "emergency",
-          "hospital",
-          "submerged",
-      ]
-  ):
-    return (
-        f"Policy Evaluation Result for Booking {b_id}: APPROVED\nAnalysis:"
-        " Severe emergency condition qualifies for 100% full refund under"
-        " policy."
-    )
+    reason_lower = eval_reason.lower()
+    if any(
+        kw in reason_lower
+        for kw in [
+            "flood",
+            "weather",
+            "medical",
+            "emergency",
+            "hospital",
+            "submerged",
+        ]
+    ):
+      return (
+          f"Policy Evaluation Result for Booking {b_id}: APPROVED\nAnalysis:"
+          " Severe emergency condition qualifies for 100% full refund under"
+          " policy."
+      )
 
-  return (
-      f"Policy Evaluation Result for Booking {b_id}: DENIED\nAnalysis: Reason"
-      " does not qualify for full refund. Standard 20% cancellation fee"
-      " applies."
-  )
+    return (
+        f"Policy Evaluation Result for Booking {b_id}: DENIED\nAnalysis:"
+        " Reason does not qualify for full refund. Standard 20% cancellation"
+        " fee applies."
+    )
   
 if __name__ == "__main__":
     transport = sys.argv[1] if len(sys.argv) > 1 else "stdio"
