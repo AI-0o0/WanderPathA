@@ -18,7 +18,10 @@ ActionName = Literal[
     "issue_travel_voucher",
     "escalate",
     "end_conversation",
+    "evaluate_cancellation_reason",
     "final_answer",
+    "escalate",
+    "end_conversation"
 ]
 
 ALLOWED_ACTIONS = set(get_args(ActionName))
