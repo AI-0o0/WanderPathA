@@ -1,10 +1,12 @@
+from langchain.tools import tool
 from shared.validation import (
     booking_exists,
     validate_refund_amount,
     validate_voucher_value,
 )
-
+from shared.database import get_connection
 from shared.authorization import manager_required
+from datetime import datetime
 
 @tool(
     "calculate_trip_cost",

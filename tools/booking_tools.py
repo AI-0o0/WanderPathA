@@ -7,7 +7,7 @@ from shared.validation import airport_exists
     return_direct=False,
     description="Get nearby airports based on the provided city.",
 )
-def GetNearbyAirports(city: str) -> list:
+def get_nearby_airports(city: str) -> list:
 
     if not city.strip():
         raise ValueError("City is required.")
@@ -40,7 +40,7 @@ def GetNearbyAirports(city: str) -> list:
     return_direct=False,
     description="Get flight options based on the provided parameters.",
 )
-def GetFlightOptions(
+def get_flight_options(
     originSkyId: str,
     destinationSkyId: str,
     departureDate: str,

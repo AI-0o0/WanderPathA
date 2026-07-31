@@ -16,9 +16,9 @@ class AgentContext:
     return_direct=False,
     description="Get the customer profile based on the provided customer ID.",
 )
-def GetCustomerProfile(runtime: ToolRuntime[AgentContext]) -> dict:
+def get_customer_profile(user_id: int) -> dict:
 
-    customer_exists(runtime.context.user_id)
+    customer_exists(user_id)
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -27,7 +27,7 @@ def GetCustomerProfile(runtime: ToolRuntime[AgentContext]) -> dict:
         SELECT *
         FROM Customers
         WHERE customer_id = %s
-    """, (runtime.context.user_id,))
+    """, (user_id,))
 
     customer = cursor.fetchone()
 
@@ -42,9 +42,9 @@ def GetCustomerProfile(runtime: ToolRuntime[AgentContext]) -> dict:
     return_direct=False,
     description="Get the booking history for the current customer."
 )
-def GetBookingHistory(runtime: ToolRuntime[AgentContext]) -> list:
+def get_booking_history(user_id: int) -> list:
 
-    customer_exists(runtime.context.user_id)
+    customer_exists(user_id)
 
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
@@ -53,7 +53,7 @@ def GetBookingHistory(runtime: ToolRuntime[AgentContext]) -> list:
         SELECT *
         FROM Bookings
         WHERE customer_id = %s
-    """, (runtime.context.user_id,))
+    """, (user_id,))
 
     bookings = cursor.fetchall()
 
@@ -69,14 +69,14 @@ def GetBookingHistory(runtime: ToolRuntime[AgentContext]) -> list:
     description="Update the customer profile."
 )
 def UpdateCustomerProfile(
-    runtime: ToolRuntime[AgentContext],
+    user_id: int,
     first_name: str,
     last_name: str,
     email: str,
     phone: str,
 ) -> dict:
 
-    customer_exists(runtime.context.user_id)
+    customer_exists(user_id)
 
     if not first_name.strip():
         raise ValueError("First name is required.")
@@ -106,7 +106,7 @@ def UpdateCustomerProfile(
         last_name,
         email,
         phone,
-        runtime.context.user_id,
+        user_id,
     ))
 
     conn.commit()
@@ -115,6 +115,6 @@ def UpdateCustomerProfile(
     conn.close()
 
     return {
-        "customer_id": runtime.context.user_id,
+        "customer_id": user_id,
         "status": "Profile Updated",
     }

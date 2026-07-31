@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from langchain.messages import AIMessage, HumanMessage, SystemMessage
 from langchain.chat_models import init_chat_model
 from dotenv import load_dotenv
-from schema import (
+from .schema import (
     ACTION_INPUT_SCHEMAS,
     AgentStep,
     MAX_STEPS,
@@ -32,9 +32,7 @@ def build_system_prompt(tool_names):
 You are a constrained travel support agent.
 
 Use ONLY these tools:
-
 {tool_list}
-
 Additional Instructions:
 1. Do NOT retry calling a tool if you already received an Observation from it.
 2. Once you have gathered enough information to answer the user's question, set your action to 'final_answer' and provide the final response in 'action_input.answer'.
@@ -43,21 +41,21 @@ Additional Instructions:
 Think step by step and return only the structured response.
 """
 
-# def build_structured_model():
-#     return init_chat_model(
-#         model="google_genai:gemini-3.5-flash-lite",
-#         max_tokens=1024,
-#         max_retries=3,
-#     ).with_structured_output(AgentStep)
-
-#groq
 def build_structured_model():
     return init_chat_model(
-        model="llama-3.3-70b-versatile",
-        model_provider="groq",
+        model="google_genai:gemini-3.5-flash-lite",
         max_tokens=1024,
         max_retries=3,
     ).with_structured_output(AgentStep)
+
+#groq
+# def build_structured_model():
+#     return init_chat_model(
+#         model="llama-3.3-70b-versatile",
+#         model_provider="groq",
+#         max_tokens=1024,
+#         max_retries=3,
+#     ).with_structured_output(AgentStep)
 
 #  # Issue 6
 async def discover_tools(client):
@@ -93,8 +91,11 @@ async def tool_call(step: AgentStep, tools: dict, context: AgentContext = None):
 
     # 2. Inject context (user_id) if missing
     if context and isinstance(payload, dict):
-        payload.setdefault("user_id", context.user_id)
-
+        if step.action in {
+            "get_booking_history",
+            "get_customer_profile",
+        }:
+            payload.setdefault("user_id", context.user_id)
     # 3. Asynchronous execution
     result = await tool.ainvoke(payload)
     return result
