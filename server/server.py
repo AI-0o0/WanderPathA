@@ -4,6 +4,8 @@ from fastmcp import FastMCP , Context
 from mcp.types import ElicitRequestedSchema
 from typing import Literal
 
+import asyncio
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.abspath(os.path.join(current_dir, ".."))
 sys.path.append(parent_dir)
@@ -46,7 +48,6 @@ mcp.tool()(get_customer_profile.func)
 mcp.tool()(get_booking_history.func)
 
 # Elication
-
 @mcp.tool()
 async def refund_with_confirmation(
     ctx: Context,
@@ -54,38 +55,86 @@ async def refund_with_confirmation(
 ):
     """Process a refund after explicit user confirmation."""
 
-    refund_amount = CalculateRefundAmount.func(
-        booking_id=booking_id
-    )
+    print("=== refund_with_confirmation started ===")
 
     employee_id = 3
 
+    print("1. Reporting progress...")
+    await ctx.report_progress(
+        progress=10,
+        total=100,
+        message="Calculating refund amount..."
+    )
+
+    print("2. Calculating refund amount...")
+    refund_amount = CalculateRefundAmount.func(
+        booking_id=booking_id
+    )
+    print(f"Refund amount = {refund_amount}")
+
+    await asyncio.sleep(1)
+
+    print("3. Reporting progress...")
+    await ctx.report_progress(
+        progress=40,
+        total=100,
+        message="Waiting for customer confirmation..."
+    )
+
+    print("4. Waiting for elicitation...")
     result = await ctx.elicit(
         message=(
             f"You are about to refund ${refund_amount:.2f} "
             f"for booking {booking_id}.\n\n"
-            "Type 'confirm' to continue or 'cancel' to abort."
         ),
         response_type=Literal["confirm", "cancel"],
     )
 
+    print("Elicitation result:", result)
+
     if result.action != "accept":
+        print("User declined.")
         return {
             "status": "Cancelled",
             "message": "Refund cancelled by user."
         }
 
     if result.data != "confirm":
+        print("User did not type confirm.")
         return {
             "status": "Cancelled",
             "message": "Refund cancelled by user."
         }
 
-    return ProcessRefund.func(
+    print("5. Reporting progress...")
+    await ctx.report_progress(
+        progress=70,
+        total=100,
+        message="Processing refund..."
+    )
+
+    await asyncio.sleep(1)
+
+    print("6. Calling ProcessRefund...")
+    refund_result = ProcessRefund.func(
         booking_id=booking_id,
         employee_id=employee_id,
         refund_amount=refund_amount,
     )
+
+    print("ProcessRefund returned:", refund_result)
+
+    print("7. Reporting completion...")
+    await ctx.report_progress(
+        progress=100,
+        total=100,
+        message="Refund completed."
+    )
+
+    print("=== refund_with_confirmation finished ===")
+
+    return refund_result
+
 # Sampling 
 @mcp.tool()
 async def evaluate_cancellation_reason(

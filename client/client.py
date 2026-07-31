@@ -15,6 +15,17 @@ mode = sys.argv[1] if len(sys.argv) > 1 else "stdio"
 
 from mcp.types import ElicitResult
 
+
+async def on_progress(progress, total, message, context):
+    percent = progress
+    if total:
+        percent = (progress / total) * 100
+
+    print(
+        f"\n[Progress] {percent:.0f}% - {message}"
+    )
+
+
 async def on_elicitation(
     mcp_context,
     params,
@@ -40,9 +51,9 @@ async def on_elicitation(
         action="decline",
     )
 callbacks = Callbacks(
-    on_elicitation=on_elicitation
+    on_progress=on_progress,
+    on_elicitation=on_elicitation,
 )
-
 
 
 async def create_client():
