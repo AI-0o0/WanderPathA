@@ -33,6 +33,10 @@ from tools.customer_tools import (
     get_booking_history
 )
 from tools.finance_and_decision_tools import ProcessRefund, CalculateRefundAmount
+from shared.prompts import *
+from shared.resources import *
+
+
 
 # Initialize FastMCP server for WanderPathA
 mcp = FastMCP("WanderPathA Travel Agent Server")
@@ -46,6 +50,40 @@ mcp.tool()(get_nearby_airports.func)
 mcp.tool()(get_flight_options.func)
 mcp.tool()(get_customer_profile.func)
 mcp.tool()(get_booking_history.func)
+mcp.prompt()(refund_explanation)
+mcp.prompt()(explain_flight_delay)
+mcp.prompt()(travel_voucher_message)
+mcp.prompt()(rebooking_options)
+mcp.prompt()(booking_confirmation)
+mcp.prompt()(flight_cancellation_notice)
+@mcp.resource("docs://refund-policy")
+def refund_policy():
+    return REFUND_POLICY
+
+
+@mcp.resource("docs://cancellation-policy")
+def cancellation_policy():
+    return CANCELLATION_POLICY
+
+
+@mcp.resource("docs://vip-benefits")
+def vip_benefits():
+    return VIP_BENEFITS
+
+
+@mcp.resource("docs://travel-voucher-rules")
+def travel_voucher_rules():
+    return TRAVEL_VOUCHER_RULES
+
+
+@mcp.resource("docs://airport-information")
+def airport_information():
+    return AIRPORT_INFORMATION
+
+
+@mcp.resource("docs://compensation-policy")
+def compensation_policy():
+    return COMPENSATION_POLICY
 
 # Elication
 @mcp.tool()
@@ -211,5 +249,5 @@ if __name__ == "__main__":
         sys.stderr.write("Starting WanderPathA Server [stdio]...")
         mcp.run(transport="stdio")
     elif transport == "http":
-        sys.stderr.write("Starting WanderPathA Server [http:8000]...")
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=8000)
+        sys.stderr.write("Starting WanderPathA Server [http:8080]...")
+        mcp.run(transport="streamable-http", host="0.0.0.0", port=8080)

@@ -41,21 +41,21 @@ Additional Instructions:
 Think step by step and return only the structured response.
 """
 
-def build_structured_model():
-    return init_chat_model(
-        model="google_genai:gemini-3.5-flash-lite",
-        max_tokens=1024,
-        max_retries=3,
-    ).with_structured_output(AgentStep)
-
-#groq
 # def build_structured_model():
 #     return init_chat_model(
-#         model="llama-3.3-70b-versatile",
-#         model_provider="groq",
+#         model="google_genai:gemini-3.5-flash-lite",
 #         max_tokens=1024,
 #         max_retries=3,
 #     ).with_structured_output(AgentStep)
+
+#groq
+def build_structured_model():
+    return init_chat_model(
+        model="llama-3.3-70b-versatile",
+        model_provider="groq",
+        max_tokens=1024,
+        max_retries=3,
+    ).with_structured_output(AgentStep)
 
 #  # Issue 6
 async def discover_tools(client):
@@ -124,16 +124,21 @@ def handle_tool_result(messages, step, result):
         )
     )
 
+conversation_history = {}
+
 async def run_agent(client, user_input: str, user_id: str = "C001"):
     tools = await discover_tools(client)
     context = AgentContext(user_id=user_id)
     system_prompt = build_system_prompt(list(tools.keys()))
     model = build_structured_model()
     
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=user_input),
-    ]
+    if user_id not in conversation_history:
+        conversation_history[user_id] = [
+            SystemMessage(content=system_prompt)
+        ]
+
+    messages = conversation_history[user_id]
+    messages.append(HumanMessage(content=user_input))
 
     # (Agent Loop)
     for step_num in range(MAX_STEPS):

@@ -36,6 +36,8 @@ async def main():
 
 
             if user_input.lower() == "logout":
+                from agent import conversation_history
+                conversation_history.pop(user_id, None)
                 logged_in = False
                 print("Logged out.")
                 break
