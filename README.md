@@ -2,9 +2,9 @@
 
 ## Team Members
 
-* Menna Sobhe
-* Moun Reda
-* Abdelrahman Eslam
+- Menna Sobhe
+- Moun Reda
+- Abdelrahman Eslam
 
 ---
 
@@ -30,12 +30,12 @@ The project demonstrates how an MCP-compliant server can safely connect Large La
 
 WanderPath Travel Agency handles customer requests related to:
 
-* Flight bookings
-* Flight delays
-* Cancellations
-* Refund requests
-* Rebooking
-* Customer support escalations
+- Flight bookings
+- Flight delays
+- Cancellations
+- Refund requests
+- Rebooking
+- Customer support escalations
 
 Traditionally, employees search multiple systems manually to retrieve this information. Giving an AI assistant direct database access would introduce serious security and authorization risks.
 
@@ -49,12 +49,12 @@ Model Context Protocol provides a standardized and secure communication layer be
 
 Instead of exposing the database directly, the MCP Server:
 
-* Controls tool access
-* Validates every request
-* Enforces authorization rules
-* Exposes reusable resources
-* Provides reusable prompts
-* Supports runtime protocol features
+- Controls tool access
+- Validates every request
+- Enforces authorization rules
+- Exposes reusable resources
+- Provides reusable prompts
+- Supports runtime protocol features
 
 This makes the system safer, more maintainable, and easier to extend.
 
@@ -123,13 +123,13 @@ The project uses a **MySQL relational database**.
 
 Main tables include:
 
-* Airports
-* Flights
-* Customers
-* Bookings
-* Employees
-* Refunds
-* Escalations
+- Airports
+- Flights
+- Customers
+- Bookings
+- Employees
+- Refunds
+- Escalations
 
 The ERD represents all entity relationships and foreign-key constraints used throughout the system.
 
@@ -139,11 +139,11 @@ The ERD represents all entity relationships and foreign-key constraints used thr
 
 The MCP Server provides secure access to company data through:
 
-* Tools
-* Resources
-* Prompts
-* Validation
-* Authorization
+- Tools
+- Resources
+- Prompts
+- Validation
+- Authorization
 
 The AI Agent never communicates directly with the database.
 
@@ -181,9 +181,9 @@ Static company information is exposed as read-only resources instead of executab
 
 Examples include:
 
-* Refund Policy
-* Travel Policies
-* Airport Information
+- Refund Policy
+- Travel Policies
+- Airport Information
 
 ---
 
@@ -191,17 +191,19 @@ Examples include:
 
 Reusable prompt templates are provided for common business tasks such as:
 
-* Draft Refund Explanation
-* Customer Response
-* Escalation Summary
+- Draft Refund Explanation
+- Customer Response
+- Escalation Summary
 
 ---
 
 ## Transport
 
-Development uses **STDIO** transport.
+The transport actually implemented in this project is **STDIO**.
 
-The server is designed to transition to **Streamable HTTP** for remote deployment.
+That choice matches the problem well because the AI agent and MCP server are meant to run locally during the lab, allowing direct process-to-process communication with no network exposure for sensitive travel data.
+
+**Streamable HTTP** is still a valid future deployment path for remote access or multiple clients, but it is not the transport built in this version.
 
 ---
 
@@ -215,10 +217,10 @@ Long-running operations report execution progress to the client instead of block
 
 Every write tool includes:
 
-* JSON Schema validation
-* Server-side validation
-* Authorization checks
-* Business rule enforcement
+- JSON Schema validation
+- Server-side validation
+- Authorization checks
+- Business rule enforcement
 
 No tool executes raw SQL received from the model.
 
@@ -252,9 +254,9 @@ User
 
 The server exposes read-only resources including:
 
-* Refund Policy
-* Travel Policies
-* Airport Status
+- Refund Policy
+- Travel Policies
+- Airport Status
 
 ---
 
@@ -262,9 +264,9 @@ The server exposes read-only resources including:
 
 Reusable prompts include:
 
-* Draft Refund Explanation
-* Generate Escalation Report
-* Customer Support Response
+- Draft Refund Explanation
+- Generate Escalation Report
+- Customer Support Response
 
 ---
 
@@ -296,7 +298,7 @@ mysql < db/data.sql
 ## 3. Run the MCP Server
 
 ```bash
-python mcp_server/server.py
+python server/server.py
 ```
 
 ---
@@ -311,32 +313,40 @@ python agent/client.py
 
 # Technologies
 
-* Python
-* MySQL
-* Model Context Protocol (MCP)
-* LangChain
-* Google Gemini 2.5 Flash
-* JSON Schema
-* python-dotenv
+- Python
+- MySQL
+- Model Context Protocol (MCP)
+- LangChain
+- Google Gemini 2.5 Flash
+- JSON Schema
+- python-dotenv
 
 ---
 
 # Security Features
 
-* No direct database access
-* Server-side validation
-* Authorization checks
-* JSON Schema validation
-* Role-based permissions
-* Secure tool execution
+- No direct database access
+- Server-side validation
+- Authorization checks
+- JSON Schema validation
+- Role-based permissions
+- Secure tool execution
 
 ---
 
 # Future Improvements
 
-* Streamable HTTP deployment
-* Live airline APIs
-* Real-time flight tracking
-* Multi-user authentication
-* Audit logging
-* Dashboard for monitoring MCP requests
+- Streamable HTTP deployment
+- Live airline APIs
+- Real-time flight tracking
+- Multi-user authentication
+- Audit logging
+- Dashboard for monitoring MCP requests
+
+---
+
+# test project
+
+```bash
+python main.py
+```
