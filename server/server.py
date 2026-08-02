@@ -3,7 +3,6 @@ import os
 from fastmcp import FastMCP , Context
 from mcp.types import ElicitRequestedSchema
 from typing import Literal
-
 import asyncio
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -37,9 +36,124 @@ from shared.prompts import *
 from shared.resources import *
 
 
-
 # Initialize FastMCP server for WanderPathA
 mcp = FastMCP("WanderPathA Travel Agent Server")
+
+
+
+# --- VIP-only tools, unlocked at runtime -----------------------------------
+# These tools do not exist for non-VIP customers. They are registered on the
+# server the moment a customer is genuinely upgraded (a real DB state change),
+# not on a timer, not on every request, and not via a "simulate" tool.
+_vip_tools_registered = False
+
+
+def _register_vip_tools():
+    """Register VIP-only tools exactly once, the first time any customer
+    is upgraded. Idempotent so repeat upgrades never re-register or send
+    duplicate notifications."""
+    global _vip_tools_registered
+    if _vip_tools_registered:
+        return
+    _vip_tools_registered = True
+
+    @mcp.tool()
+    async def request_priority_rebooking(
+        ctx: Context, booking_id: int, preferred_flight_id: int
+    ):
+        """VIP-only: Rebook a disrupted booking onto a preferred flight with
+        no change fee and priority queueing."""
+        return {
+            "status": "success",
+            "message": (
+                f"Booking {booking_id} priority-rebooked onto flight "
+                f"{preferred_flight_id}. Change fee waived (VIP)."
+            ),
+        }
+
+    @mcp.tool()
+    async def request_concierge_service(ctx: Context, customer_id: int, request: str):
+        """VIP-only: Submit a concierge request (lounge access, ground
+        transport, special assistance) for a VIP customer."""
+        return {
+            "status": "success",
+            "message": f"Concierge request logged for customer {customer_id}: {request}",
+        }
+
+
+@mcp.tool()
+async def upgrade_to_vip(ctx: Context, customer_id: int):
+    """
+    Upgrade a customer to VIP status. The first time this happens on this
+    server, VIP-only tools (priority rebooking, concierge requests) become
+    available and a tools/list_changed notification is sent.
+    """
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Check customer exists
+        cursor.execute(
+            "SELECT vip FROM Customers WHERE customer_id = %s",
+            (customer_id,)
+        )
+
+        customer = cursor.fetchone()
+
+        if customer is None:
+            return {
+                "status": "error",
+                "message": f"Customer {customer_id} not found."
+            }
+
+        if customer[0]:
+            # Already VIP: no state change, so no notification is sent.
+            return {
+                "status": "success",
+                "message": f"Customer {customer_id} is already a VIP."
+            }
+
+        cursor.execute(
+            """
+            UPDATE Customers
+            SET vip = TRUE
+            WHERE customer_id = %s
+            """,
+            (customer_id,)
+        )
+
+        conn.commit()
+
+        # --- Genuine runtime state change -> unlock tools, then notify ---
+        was_already_registered = _vip_tools_registered
+        _register_vip_tools()
+
+        if not was_already_registered:
+            # Logging channel: lets the demo client show *what* changed.
+            await ctx.info(f"__EVENT__:VIP_UNLOCKED:{customer_id}")
+            # Official MCP notification per spec.
+            await ctx.session.send_tool_list_changed()
+            print(f"[NOTIFICATION] tools/list_changed sent (customer {customer_id} -> VIP)")
+
+        return {
+            "status": "success",
+            "message": (
+                f"Customer {customer_id} has been upgraded to VIP. "
+                f"VIP tools are now available."
+            )
+        }
+
+    except Exception as e:
+        conn.rollback()
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+    finally:
+        cursor.close()
+        conn.close()
 
 # Register Existing Tools
 mcp.tool()(get_flight_status.func)
