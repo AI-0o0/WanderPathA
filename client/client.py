@@ -6,7 +6,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_mcp_adapters.tools import load_mcp_tools
 from langchain_mcp_adapters.resources import load_mcp_resources
 from langchain_mcp_adapters.callbacks import Callbacks, CallbackContext
-
+current_session = None
 path_to_mcp_server = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../server/server.py")
 )
@@ -50,7 +50,40 @@ async def on_elicitation(
     return ElicitResult(
         action="decline",
     )
+async def on_logging_message(params, context):
+    global current_session
+
+    message = str(params.data)
+
+    print("\n" + "=" * 50)
+    print("SERVER NOTIFICATION")
+    print("=" * 50)
+    print(message)
+
+    if message.startswith("__EVENT__:VIP_UNLOCKED"):
+        customer_id = message.split(":")[-1]
+        print("\n[NOTIFICATION] tools/list_changed received from server")
+        print(f"Reason: customer {customer_id} was just upgraded to VIP.")
+        print("Reloading tool list...\n")
+
+        previous_names = {t.name for t in getattr(create_client, "last_tools", [])}
+        tools = await load_mcp_tools(current_session)
+        new_names = {t.name for t in tools}
+
+        print(f"Found {len(tools)} tool(s) total")
+        newly_added = new_names - previous_names
+        if newly_added:
+            print("Newly available:")
+            for name in sorted(newly_added):
+                print(f"  + {name}")
+        else:
+            for tool in tools:
+                print(f"- {tool.name}")
+
+        # Cache for future diffs and hand the fresh set back to the running agent
+        create_client.last_tools = tools
 callbacks = Callbacks(
+    on_logging_message=on_logging_message,
     on_progress=on_progress,
     on_elicitation=on_elicitation,
 )
@@ -81,6 +114,8 @@ async def create_client():
     callbacks=callbacks,
     )
     async with client.session("wanderpath_server") as session:
+        global current_session
+        current_session = session
         # 1. Capability Negotiation
         caps = session.get_server_capabilities()
         print("=" * 60)
@@ -128,6 +163,7 @@ async def create_client():
                         print(f"  {tool.description}")
             else:
                 print("Server supports tools, but no tools are registered.")
+            create_client.last_tools = tools
 
         print("\nFinished.")
         return client

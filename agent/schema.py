@@ -1,38 +1,39 @@
-from typing import Literal, get_args
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 
 MAX_STEPS = 6
 VALIDATION_RETRIES = 2
 
-
-ActionName = Literal[
-    "get_booking_history",
-    "get_flight_status",
-    "get_delay_duration",
-    "check_alternative_transport",
-    "check_refund_eligibility",
-    "calculate_refund_amount",
-    "refund_with_confirmation",
-    "issue_travel_voucher",
-    "escalate",
-    "end_conversation",
-    "evaluate_cancellation_reason",
-    "final_answer",
-    "escalate",
-    "end_conversation"
-]
-
-ALLOWED_ACTIONS = set(get_args(ActionName))
 TERMINAL_ACTIONS = {"escalate", "end_conversation", "final_answer"}
 
 
 class AgentStep(BaseModel):
+    """Fallback/typing reference. The model actually bound for structured
+    output is built fresh each turn by build_agent_step_model, since the
+    set of valid `action` values changes at runtime (e.g. VIP unlock)."""
+
     thought: str
-    action: ActionName
+    action: str
     action_input: dict = Field(default_factory=dict)
     is_final: bool
+
+
+def build_agent_step_model(action_names):
+    """Builds an AgentStep schema whose `action` field is a Literal
+    constrained to exactly the tools available *right now* (plus the
+    fixed terminal actions). Called once per agent turn, so a genuine
+    runtime tool-list change immediately changes what the LLM is allowed
+    to output — no static enum, no restart, no reconnect."""
+    allowed = tuple(sorted(set(action_names) | TERMINAL_ACTIONS))
+    return create_model(
+        "AgentStep",
+        thought=(str, ...),
+        action=(Literal[allowed], ...),
+        action_input=(dict, Field(default_factory=dict)),
+        is_final=(bool, ...),
+    )
 
 
 class StrictInput(BaseModel):

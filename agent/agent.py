@@ -7,8 +7,11 @@ from dotenv import load_dotenv
 from .schema import (
     ACTION_INPUT_SCHEMAS,
     AgentStep,
+    build_agent_step_model,
+    TERMINAL_ACTIONS,
     MAX_STEPS,
 )
+
 
 
 load_dotenv()
@@ -49,13 +52,17 @@ Think step by step and return only the structured response.
 #     ).with_structured_output(AgentStep)
 
 #groq
-def build_structured_model():
+def build_structured_model(action_names):
+    """Rebuilds the structured-output schema from whatever tools are
+    live right now, so a runtime tool-list change (e.g. VIP unlock)
+    immediately changes what the LLM is allowed to output."""
+    step_model = build_agent_step_model(action_names)
     return init_chat_model(
         model="llama-3.3-70b-versatile",
         model_provider="groq",
         max_tokens=1024,
         max_retries=3,
-    ).with_structured_output(AgentStep)
+    ).with_structured_output(step_model)
 
 #  # Issue 6
 async def discover_tools(client):
@@ -68,8 +75,7 @@ async def discover_tools(client):
 
 #   # Issue  10    
 def validate_step(step, tools) -> bool:
-    valid_actions = {"final_answer", "end_conversation", "escalate"}
-    return step.action in valid_actions or step.action in tools
+    return step.action in TERMINAL_ACTIONS or step.action in tools
 
 #  # Issue 7 
 #  Issue #7: Tool Execution Engine
@@ -125,17 +131,43 @@ def handle_tool_result(messages, step, result):
     )
 
 conversation_history = {}
+known_tools_by_user = {}
 
 async def run_agent(client, user_input: str, user_id: str = "C001"):
     tools = await discover_tools(client)
+    current_tool_names = set(tools.keys())
     context = AgentContext(user_id=user_id)
-    system_prompt = build_system_prompt(list(tools.keys()))
-    model = build_structured_model()
-    
+    system_prompt = build_system_prompt(sorted(current_tool_names))
+    model = build_structured_model(list(current_tool_names))
+
     if user_id not in conversation_history:
         conversation_history[user_id] = [
             SystemMessage(content=system_prompt)
         ]
+    else:
+        previous_tool_names = known_tools_by_user.get(user_id, current_tool_names)
+        newly_available = current_tool_names - previous_tool_names
+        if newly_available:
+            # Genuine runtime tool-list change mid-conversation (e.g. the
+            # customer was just upgraded to VIP). Refresh the system
+            # prompt in place and drop a notice into the transcript so
+            # the model knows what's new — no reset, no reconnect.
+            conversation_history[user_id][0] = SystemMessage(content=system_prompt)
+            conversation_history[user_id].append(
+                HumanMessage(
+                    content=(
+                        "SYSTEM NOTICE: New tools just became available: "
+                        f"{', '.join(sorted(newly_available))}. "
+                        "You may use them starting now if relevant."
+                    )
+                )
+            )
+            print(
+                f"\n[agent] Tool list changed mid-conversation for {user_id}: "
+                f"+{sorted(newly_available)}"
+            )
+
+    known_tools_by_user[user_id] = current_tool_names
 
     messages = conversation_history[user_id]
     messages.append(HumanMessage(content=user_input))
